@@ -48,14 +48,6 @@ interface options extends InstanceType<typeof baseMixins> {
 
 const dirtyTypes = ['color', 'file', 'time', 'date', 'datetime-local', 'week', 'month']
 
-interface InputEvent extends UIEvent {
-  isComposing: Boolean
-}
-interface KeyboardEvent extends UIEvent {
-  keyCode: Number
-  isComposing: Boolean
-}
-
 /* @vue/component */
 export default baseMixins.extend<options>().extend({
   name: 'v-text-field',
@@ -63,6 +55,11 @@ export default baseMixins.extend<options>().extend({
   directives: { ripple },
 
   inheritAttrs: false,
+
+  model: {
+    prop: 'value',
+    event: 'update:value',
+  },
 
   props: {
     appendOuterIcon: String,
@@ -103,6 +100,7 @@ export default baseMixins.extend<options>().extend({
     initialValue: null,
     isBooted: false,
     isClearing: false,
+    isComposing: false,
   }),
 
   computed: {
@@ -152,6 +150,9 @@ export default baseMixins.extend<options>().extend({
       set (val: any) {
         this.lazyValue = val
         this.$emit('input', this.lazyValue)
+        if (!this.isComposing) {
+          this.$emit('update:value', this.lazyValue)
+        }
       },
     },
     isDirty (): boolean {
@@ -401,6 +402,8 @@ export default baseMixins.extend<options>().extend({
           input: this.onInput,
           focus: this.onFocus,
           keydown: this.onKeyDown,
+          compositionstart: this.onCompositionStart,
+          compositionend: this.onCompositionEnd,
         }),
         ref: 'input',
       })
@@ -443,6 +446,13 @@ export default baseMixins.extend<options>().extend({
 
       this.$refs.input.focus()
     },
+    onCompositionEnd (e: Event) {
+      this.isComposing = false
+      this.onInput(e)
+    },
+    onCompositionStart (e: Event) {
+      this.isComposing = true
+    },
     onFocus (e?: Event) {
       if (!this.$refs.input) return
 
@@ -456,14 +466,12 @@ export default baseMixins.extend<options>().extend({
       }
     },
     onInput (e: Event) {
-      if (!(e as InputEvent).isComposing) {
-        const target = e.target as HTMLInputElement
-        this.internalValue = target.value
-        this.badInput = target.validity && target.validity.badInput
-      }
+      const target = e.target as HTMLInputElement
+      this.internalValue = target.value
+      this.badInput = target.validity && target.validity.badInput
     },
     onKeyDown (e: KeyboardEvent) {
-      if (!e.isComposing && e.keyCode === keyCodes.enter) {
+      if (!this.isComposing && e.keyCode === keyCodes.enter) {
         this.$emit('change', this.internalValue)
       }
 
